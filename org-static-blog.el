@@ -1,4 +1,4 @@
-;;; org-static-blog.el --- a simple org-mode based static blog generator
+;;; org-static-blog.el --- a simple org-mode based static blog generator -*- lexical-binding: t; -*-
 
 ;; Author: Bastian Bechtold
 ;; Contrib: Shmavon Gazanchyan, Rafał -rsm- Marek, neeasade,
@@ -350,6 +350,38 @@ the variables `org-static-blog-preview-start' and
    "</body>\n"
    "</html>\n"))
 
+(defun org-static-blog-index-template (tTitle tContent &optional tDescription)
+  "Create the index template that is used to generate the index.html"
+  (concat
+   "<!DOCTYPE html>\n"
+   "<html>\n"
+   "  <head>\n"
+   "    <meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\"/>\n"
+   "    <title>" tTitle "</title>\n"
+   "    <link rel=\"stylesheet\" href=\"https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css\">\n"
+   "    <link rel=\"stylesheet\" href=\"https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css\">\n"
+   "    <link href= \"/home.css\" rel=\"stylesheet\" type=\"text/css\" />\n"
+   "  </head>\n"
+   "<body>\n"
+   "<nav class=\"navbar navbar-default navbar-fixed-top\" style=\"opacity: .9\" role=\"navigation\">\n"
+   "  <div class=\"container-fluid\">\n"
+   "    <div class=\"navbar-header\">\n"
+   "        <a class=\"navbar-brand\" href=\"#\">Albert Zhou's Blog</a>\n"
+   "    </div>\n"
+        ;; <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        ;;     <ul class="nav navbar-nav navbar-right">
+        ;;         <li class="active"><a href="#">博客</a></li>
+        ;;         <li><a href="https://yinwang1.wordpress.com">草稿</a></li>
+        ;;     </ul>
+        ;; </div>
+   "  </div>\n</nav>\n"
+   "  <div id=\"outer\">\n"
+   tContent
+   "  </div>\n"
+   "</body>\n"
+   "</html>\n"))
+
+
 (defun org-static-blog-gettext (text-id)
   "Return localized text.
 Depends on org-static-blog-langcode and org-static-blog-texts."
@@ -378,8 +410,8 @@ unconditionally."
   ;; don't spam too many deprecation warnings:
   (let ((org-static-blog-enable-deprecation-warning nil))
     (org-static-blog-assemble-index)
-    (org-static-blog-assemble-rss)
-    (org-static-blog-assemble-archive)
+    ;; (org-static-blog-assemble-rss)
+    ;; (org-static-blog-assemble-archive)
     (if org-static-blog-enable-tags
         (org-static-blog-assemble-tags))))
 
@@ -669,18 +701,41 @@ The index, archive, tags, and RSS feed are not updated."
 (org-export-define-derived-backend 'org-static-blog-post-bare 'html
   :translate-alist '((template . (lambda (contents info) contents))))
 
+
+;; (defun org-static-blog-assemble-index ()
+;;   "Assemble the blog index page.
+;; The index page contains the last `org-static-blog-index-length`
+;; posts as full text posts."
+;;   (let ((post-filenames (org-static-blog-get-post-filenames)))
+;;     ;; reverse-sort, so that the later `last` will grab the newest posts
+;;     (setq post-filenames (sort post-filenames (lambda (x y) (time-less-p (org-static-blog-get-date x)
+;;                                                                          (org-static-blog-get-date y)))))
+;;     (org-static-blog-assemble-multipost-page
+;;      (concat-to-dir org-static-blog-publish-directory org-static-blog-index-file)
+;;      (last post-filenames org-static-blog-index-length)
+;;      org-static-blog-index-front-matter)))
+
 (defun org-static-blog-assemble-index ()
-  "Assemble the blog index page.
-The index page contains the last `org-static-blog-index-length`
-posts as full text posts."
-  (let ((post-filenames (org-static-blog-get-post-filenames)))
-    ;; reverse-sort, so that the later `last` will grab the newest posts
-    (setq post-filenames (sort post-filenames (lambda (x y) (time-less-p (org-static-blog-get-date x)
-                                                                         (org-static-blog-get-date y)))))
-    (org-static-blog-assemble-multipost-page
-     (concat-to-dir org-static-blog-publish-directory org-static-blog-index-file)
-     (last post-filenames org-static-blog-index-length)
-     org-static-blog-index-front-matter)))
+  "Re-render the blog archive page.
+The archive page contains single-line links and dates for every
+blog post, but no post body."
+  (let ((index-filename (concat-to-dir org-static-blog-publish-directory org-static-blog-index-file))
+        (archive-entries nil)
+        (post-filenames (org-static-blog-get-post-filenames)))
+    (setq post-filenames (sort post-filenames (lambda (x y) (time-less-p
+                                                             (org-static-blog-get-date y)
+                                                             (org-static-blog-get-date x)))))
+    (org-static-blog-with-find-file
+     index-filename
+     (org-static-blog-index-template
+      org-static-blog-publish-title
+      (concat
+       "  <div class=\"outer\">\n"
+       "    <ul class=\"list-group\">\n"
+       (apply 'concat (mapcar 'org-static-blog-get-post-summary post-filenames))
+       "    </ul>\n"
+       "  </div>\n")))))
+
 
 (defun org-static-blog-assemble-multipost-page (pub-filename post-filenames &optional front-matter)
   "Assemble a page that contains multiple posts one after another.
@@ -708,12 +763,10 @@ Posts are sorted in descending time."
 This function is called for every post and prepended to the post body.
 Modify this function if you want to change a posts headline."
   (concat
-   "<div class=\"post-date\">" (format-time-string (org-static-blog-gettext 'date-format)
+   "  <div class=\"post-date\">" (format-time-string (org-static-blog-gettext 'date-format)
 						   (org-static-blog-get-date post-filename))
-   "</div>"
-   "<h1 class=\"post-title\">"
-   "<a href=\"" (org-static-blog-get-post-url post-filename) "\">" (org-static-blog-get-title post-filename) "</a>"
-   "</h1>\n"))
+   "</div>\n"
+   "  <h1>" (org-static-blog-get-title post-filename) "</h1>\n"))
 
 
 (defun org-static-blog-post-taglist (post-filename)
@@ -840,15 +893,18 @@ blog post, but no post body."
         (archive-entries nil)
         (post-filenames (org-static-blog-get-post-filenames)))
     (setq post-filenames (sort post-filenames (lambda (x y) (time-less-p
-                                                        (org-static-blog-get-date y)
-                                                        (org-static-blog-get-date x)))))
+                                                             (org-static-blog-get-date y)
+                                                             (org-static-blog-get-date x)))))
     (org-static-blog-with-find-file
      archive-filename
-     (org-static-blog-template
+     (org-static-blog-index-template
       org-static-blog-publish-title
       (concat
-       "<h1 class=\"title\">" (org-static-blog-gettext 'archive) "</h1>\n"
-       (apply 'concat (mapcar 'org-static-blog-get-post-summary post-filenames)))))))
+       "  <div class=\"outer\">\n"
+       "    <ul class=\"list-group\">\n"
+       (apply 'concat (mapcar 'org-static-blog-get-post-summary post-filenames))
+       "    </ul>\n"
+       "  </div>\n")))))
 
 (defun org-static-blog-get-post-summary (post-filename)
   "Assemble post summary for an archive page.
@@ -856,12 +912,10 @@ This function is called for every post on the archive and
 tags-archive page. Modify this function if you want to change an
 archive headline."
   (concat
-   "<div class=\"post-date\">"
-   (format-time-string (org-static-blog-gettext 'date-format) (org-static-blog-get-date post-filename))
-   "</div>"
-   "<h2 class=\"post-title\">"
-   "<a href=\"" (org-static-blog-get-post-url post-filename) "\">" (org-static-blog-get-title post-filename) "</a>"
-   "</h2>\n"))
+   "      <li class=\"list-group-item title\">\n"
+   "        <div class=\"post-date\">" (format-time-string (org-static-blog-gettext 'date-format) (org-static-blog-get-date post-filename)) "</div>\n"
+   "        <a href=\"" (org-static-blog-get-post-url post-filename) "\">" (org-static-blog-get-title post-filename) "</a>\n"
+   "      </li>\n"))
 
 (defun org-static-blog-assemble-tags ()
   "Render the tag archive and tag pages."
