@@ -244,7 +244,7 @@ the variables `org-static-blog-preview-start' and
      ("it" . "%d/%m/%Y")
      ("es" . "%d/%m/%Y")
      ("fr" . "%d-%m-%Y")
-     ("zh" . "%Y-%m-%d")
+     ("zh" . "%Y年%m月%d日")
      ("ja" . "%Y/%m/%d"))
     (tags
      ("en" . "Tags")
